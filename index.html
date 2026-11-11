@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Map of Berlin Parks & Gardens</title>
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #1a1a1a;
+      color: #ffffff;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background-color: #242424;
+      padding: 15px 20px;
+      border-bottom: 2px solid #2a9d8f;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 1.8rem;
+      letter-spacing: 0.5px;
+      color: #e9c46a;
+    }
+
+    header p {
+      font-size: 0.95rem;
+      color: #a8dadc;
+    }
+
+    #app-container {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 75px);
+      width: 100vw;
+      overflow: hidden;
+    }
+
+    /* Map Container */
+    #map {
+      flex: 3;
+      height: 100%;
+      width: 100%;
+      background: #e5e3df; /* Visible background while tiles load */
+    }
+
+    /* Sidebar Container */
+    #sidebar {
+      flex: 1;
+      min-width: 320px;
+      background-color: #242424;
+      padding: 25px;
+      border-left: 1px solid #333333;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      overflow-y: auto;
+    }
+
+    #sidebar h2 {
+      font-size: 1.5rem;
+      margin-bottom: 15px;
+      color: #2a9d8f;
+      border-bottom: 1px solid #444;
+      padding-bottom: 8px;
+    }
+
+    .info-box {
+      background-color: #2e2e2e;
+      border-radius: 8px;
+      padding: 18px;
+      margin-top: 10px;
+      line-height: 1.6;
+      border: 1px solid #444;
+    }
+
+    .info-box h3 {
+      font-size: 1.3rem;
+      margin-bottom: 8px;
+      color: #ffffff;
+    }
+
+    .info-box p {
+      font-size: 0.95rem;
+      color: #dddddd;
+      margin-bottom: 8px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .badge-royal { background-color: #e76f51; color: #fff; }
+    .badge-urban { background-color: #2a9d8f; color: #fff; }
+    .badge-nature { background-color: #e9c46a; color: #1a1a1a; }
+
+    /* Custom Leaflet Marker Icons */
+    .custom-div-icon {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 50%;
+      color: white;
+      font-size: 16px;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 8px rgba(0,0,0,0.5);
+    }
+    .icon-royal { background-color: #e76f51; }
+    .icon-urban { background-color: #2a9d8f; }
+    .icon-nature { background-color: #e9c46a; color: #000; }
+
+    @media (max-width: 768px) {
+      #app-container {
+        flex-direction: column;
+      }
+      #sidebar {
+        min-width: 100%;
+        height: 280px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>BERLIN'S PARKS & GREEN SPACES</h1>
+    <p>Explore Berlin's iconic nature oases — Click any marker for details</p>
+  </header>
+
+  <div id="app-container">
+    <div id="map"></div>
+    
+    <aside id="sidebar">
+      <h2>Park Overview</h2>
+      <div id="sidebar-content">
+        <p style="color: #aaa;">Click a marker on the map to display the park details and description here.</p>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <script>
+    // 1. Initialize Map centered over Berlin
+    const map = L.map('map').setView([52.516, 13.385], 12);
+
+    // 2. Open Access Esri World Topo Map Tile Server (Public access, no keys, works on file://)
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), swisstopo, MapmyIndia, &#169; OpenStreetMap contributors',
+      maxZoom: 18
+    }).addTo(map);
+
+    // Force map container recalculation so tiles render immediately
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 200);
+
+    // 3. Define 3 Custom Marker Icons
+    const royalIcon = L.divIcon({
+      className: 'custom-div-icon icon-royal',
+      html: '👑',
+      iconSize: [34, 34],
+      iconAnchor: [17, 17]
+    });
+
+    const urbanIcon = L.divIcon({
+      className: 'custom-div-icon icon-urban',
+      html: '🌆',
+      iconSize: [34, 34],
+      iconAnchor: [17, 17]
+    });
+
+    const natureIcon = L.divIcon({
+      className: 'custom-div-icon icon-nature',
+      html: '🌿',
+      iconSize: [34, 34],
+      iconAnchor: [17, 17]
+    });
+
+    const categories = {
+      'royal': { icon: royalIcon, badgeClass: 'badge-royal', label: 'Historic & Royal Park' },
+      'urban': { icon: urbanIcon, badgeClass: 'badge-urban', label: 'Urban Recreation Park' },
+      'nature': { icon: natureIcon, badgeClass: 'badge-nature', label: 'Nature & Botanical' }
+    };
+
+    // 4. Berlin Parks Data (10 Locations)
+    const berlinParks = [
+      {
+        name: "Großer Tiergarten",
+        lat: 52.5145,
+        lng: 13.3600,
+        category: "royal",
+        district: "Mitte",
+        description: "Berlin's largest central park featuring expansive lawns, shadowed avenues, the Victory Column, and romantic lakes."
+      },
+      {
+        name: "Charlottenburg Palace Gardens",
+        lat: 52.5211,
+        lng: 13.2958,
+        category: "royal",
+        district: "Charlottenburg",
+        description: "A gorgeous baroque palace garden laid out in the 17th century, featuring baroque parterres, a carp pond, and serene pavilions."
+      },
+      {
+        name: "Tempelhofer Feld",
+        lat: 52.4731,
+        lng: 13.4042,
+        category: "urban",
+        district: "Tempelhof",
+        description: "A massive public park on the grounds of the historic former Tempelhof Airport where locals jog, skate on runways, and picnic."
+      },
+      {
+        name: "Mauerpark",
+        lat: 52.5448,
+        lng: 13.4025,
+        category: "urban",
+        district: "Prenzlauer Berg",
+        description: "Located on a former section of the Berlin Wall 'death strip', famed for its lively weekend flea market, karaoke, and graffiti wall."
+      },
+      {
+        name: "Park am Gleisdreieck",
+        lat: 52.4978,
+        lng: 13.3744,
+        category: "urban",
+        district: "Kreuzberg / Schöneberg",
+        description: "An award-winning modern park built over former railway yards, featuring skate areas, community gardens, and remnant rail tracks."
+      },
+      {
+        name: "Volkspark Friedrichshain",
+        lat: 52.5281,
+        lng: 13.4372,
+        category: "urban",
+        district: "Friedrichshain",
+        description: "Berlin's oldest public park, featuring WWII rubble hills, an open-air cinema, sports facilities, and the Märchenbrunnen fountain."
+      },
+      {
+        name: "Viktoriapark",
+        lat: 52.4883,
+        lng: 13.3817,
+        category: "nature",
+        district: "Kreuzberg",
+        description: "Home to Kreuzberg hill, the highest natural point in inner Berlin, complete with a dramatic artificial waterfall and views over the city."
+      },
+      {
+        name: "Treptower Park",
+        lat: 52.4914,
+        lng: 13.4681,
+        category: "royal",
+        district: "Treptow",
+        description: "Spacious riverside park along the Spree river, home to the massive Soviet War Memorial, boat rentals, and scenic paths."
+      },
+      {
+        name: "Botanical Garden Berlin",
+        lat: 52.4431,
+        lng: 13.3050,
+        category: "nature",
+        district: "Steglitz",
+        description: "One of the world's largest botanical gardens, featuring over 20,000 plant species and historic tropical glasshouses."
+      },
+      {
+        name: "Gardens of the World (Gärten der Welt)",
+        lat: 52.5383,
+        lng: 13.5764,
+        category: "nature",
+        district: "Marzahn",
+        description: "An international garden exhibition park showcasing traditional garden designs from China, Japan, Bali, the Middle East, and Italy."
+      }
+    ];
+
+    const sidebarContent = document.getElementById('sidebar-content');
+
+    // 5. Render Markers and Bind Events
+    berlinParks.forEach(park => {
+      const catData = categories[park.category];
+
+      const marker = L.marker([park.lat, park.lng], { icon: catData.icon }).addTo(map);
+
+      marker.bindPopup(`
+        <strong>${park.name}</strong><br>
+        <em>District: ${park.district}</em>
+      `);
+
+      marker.on('click', () => {
+        sidebarContent.innerHTML = `
+          <div class="info-box">
+            <span class="badge ${catData.badgeClass}">${catData.label}</span>
+            <h3>${park.name}</h3>
+            <p><strong>District:</strong> ${park.district}</p>
+            <p><strong>Coordinates:</strong> ${park.lat.toFixed(4)}, ${park.lng.toFixed(4)}</p>
+            <hr style="border-color: #444; margin: 12px 0;">
+            <p>${park.description}</p>
+          </div>
+        `;
+      });
+    });
+  </script>
+</body>
+</html>
